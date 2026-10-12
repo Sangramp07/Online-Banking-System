@@ -1,0 +1,297 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum CustomerStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum AccountType {
+  SAVINGS
+  CURRENT
+}
+
+enum AccountStatus {
+  ACTIVE
+  RESTRICTED
+  FROZEN
+  CLOSED
+}
+
+enum TransferStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum EntryType {
+  DEBIT
+  CREDIT
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  DANGER
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  passwordHash        String
+  role                Role                 @default(CUSTOMER)
+  isActive            Boolean              @default(true)
+  lastLoginAt         DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  customer            Customer?
+  supportMessages     SupportMessage[]
+  auditLogs           AuditLog[]
+  notifications       Notification[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+model Customer {
+  id             String         @id @default(uuid())
+  customerNumber String         @unique
+  userId         String         @unique
+  fullName       String
+  mobileNumber   String
+  dateOfBirth    String
+  address        String
+  kycStatus      KycStatus      @default(VERIFIED)
+  status         CustomerStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts       Account[]
+  beneficiaries  Beneficiary[]
+  tickets        SupportTicket[]
+
+  @@map("customers")
+}
+
+model Account {
+  id             String          @id @default(uuid())
+  accountNumber  String          @unique
+  customerId     String
+  accountType    AccountType     @default(SAVINGS)
+  balance        Decimal         @default(0.00) @db.Decimal(18, 2)
+  ledgerBalance  Decimal         @default(0.00) @db.Decimal(18, 2)
+  currency       String          @default("INR")
+  status         AccountStatus   @default(ACTIVE)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  customer       Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sentTransfers  Transfer[]      @relation("SourceAccountTransfers")
+  recvTransfers  Transfer[]      @relation("DestinationAccountTransfers")
+  entries        TransactionEntry[]
+
+  @@map("accounts")
+}
+
+model Beneficiary {
+  id             String   @id @default(uuid())
+  customerId     String
+  name           String
+  accountNumber  String
+  bankName       String   @default("NEXBANK")
+  routingNumber  String   @default("021000021")
+  nickname       String?
+  isVerified     Boolean  @default(true)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("beneficiaries")
+}
+
+model Transfer {
+  id                   String          @id @default(uuid())
+  reference            String          @unique
+  sourceAccountId      String
+  destinationAccountId String
+  amount               Decimal         @db.Decimal(18, 2)
+  currency             String          @default("USD")
+  description          String
+  status               TransferStatus  @default(PENDING)
+  failureReason        String?
+  idempotencyKey       String?         @unique
+  initiatedByUserId    String
+  reversalReason       String?
+  reversedAt           DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime        @default(now())
+
+  sourceAccount        Account         @relation("SourceAccountTransfers", fields: [sourceAccountId], references: [id])
+  destinationAccount   Account         @relation("DestinationAccountTransfers", fields: [destinationAccountId], references: [id])
+  entries              TransactionEntry[]
+
+  @@map("transfers")
+}
+
+model TransactionEntry {
+  id           String    @id @default(uuid())
+  transferId   String
+  accountId    String
+  type         EntryType
+  amount       Decimal   @db.Decimal(18, 2)
+  balanceAfter Decimal   @db.Decimal(18, 2)
+  description  String
+  createdAt    DateTime  @default(now())
+
+  transfer     Transfer  @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  account      Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt])
+  @@map("transaction_entries")
+}
+
+model SupportTicket {
+  id           String         @id @default(uuid())
+  ticketNumber String         @unique
+  customerId   String
+  subject      String
+  category     String
+  priority     TicketPriority @default(MEDIUM)
+  status       TicketStatus   @default(OPEN)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  customer     Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  messages     SupportMessage[]
+
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id           String        @id @default(uuid())
+  ticketId     String
+  senderUserId String
+  message      String        @db.Text
+  isAdminReply Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+
+  ticket       SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender       User          @relation(fields: [senderUserId], references: [id], onDelete: Cascade)
+
+  @@map("support_messages")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  title     String
+  message   String           @db.Text
+  type      NotificationType @default(INFO)
+  isRead    Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          String       @id @default(uuid())
+  actorUserId String?
+  action      String
+  targetType  String?
+  targetId    String?
+  details     String?      @db.Text
+  ipAddress   String?
+  userAgent   String?
+  outcome     AuditOutcome @default(SUCCESS)
+  reason      String?
+  createdAt   DateTime     @default(now())
+
+  actor       User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model IdempotencyRecord {
+  id                 String   @id @default(uuid())
+  key                String   @unique
+  requestHash        String?
+  responseStatusCode Int
+  responseBody       String   @db.Text
+  createdAt          DateTime @default(now())
+  expiresAt          DateTime
+
+  @@map("idempotency_records")
+}
+
+model ContactEnquiry {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  subject   String
+  message   String   @db.Text
+  status    String   @default("NEW")
+  createdAt DateTime @default(now())
+
+  @@map("contact_enquiries")
+}
