@@ -17,5 +17,9 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.7",
+    "mysql2": "^3.24.5"
   }
 }
