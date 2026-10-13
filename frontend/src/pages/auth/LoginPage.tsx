@@ -44,7 +44,7 @@ export const LoginPage: React.FC = () => {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'alex.morgan@nexbank.demo',
+      email: 'arjun.sharma@nexbank.demo',
       password: 'Customer@123456',
     },
   });
@@ -98,7 +98,7 @@ export const LoginPage: React.FC = () => {
         <div className="flex bg-slate-200 dark:bg-slate-900 p-1 rounded-xl mb-4 text-xs font-semibold">
           <button
             type="button"
-            onClick={() => handleSelectDemoUser('customer', 'alex.morgan@nexbank.demo', 'Customer@123456')}
+            onClick={() => handleSelectDemoUser('customer', 'arjun.sharma@nexbank.demo', 'Customer@123456')}
             className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 transition ${
               activeTab === 'customer'
                 ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
@@ -133,10 +133,10 @@ export const LoginPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-2 text-[11px]">
             <button
               type="button"
-              onClick={() => handleSelectDemoUser('customer', 'alex.morgan@nexbank.demo', 'Customer@123456')}
+              onClick={() => handleSelectDemoUser('customer', 'arjun.sharma@nexbank.demo', 'Customer@123456')}
               className="text-left px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800/80 hover:border-blue-500 transition font-medium text-slate-700 dark:text-slate-300"
             >
-              👤 Alex Morgan <span className="block text-[9px] text-slate-400">Customer</span>
+              👤 Arjun Sharma <span className="block text-[9px] text-slate-400">Customer</span>
             </button>
             <button
               type="button"
